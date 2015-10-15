@@ -6,7 +6,7 @@
     $form = New-Object -TypeName System.Windows.Forms.Form -Property @{Width=440;Height=640}
     $web  = New-Object -TypeName System.Windows.Forms.WebBrowser -Property @{Width=420;Height=600;Url=($url -f ($Scope -join "%20")) }
     $DocComp  = {
-            $Global:uri = $web.Url.AbsoluteUri
+            $uri = $web.Url.AbsoluteUri
             if ($Global:Uri -match "error=[^&]*|code=[^&]*") {$form.Close() }
     }
     $web.ScriptErrorsSuppressed = $true
@@ -14,6 +14,7 @@
     $form.Controls.Add($web)
     $form.Add_Shown({$form.Activate()})
     $form.ShowDialog() | Out-Null
+    return $uri
     }
     #endregion
 

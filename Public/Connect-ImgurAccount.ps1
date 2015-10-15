@@ -18,69 +18,40 @@
 #>
 Function Connect-ImgurAccount {
 [CmdletBinding()]
-param($ClientID,$clientSecret,[Switch]$force)
-
-#load private functions
-$PrivateFunctions = get-childitem "$((Get-Module PSImgur).ModuleBase)\Private" 
-
-Foreach ($import in $PrivateFunctions)
-    {
-        Try
-        {
-            . $import.fullname
-        }
-        Catch
-        {
-            Write-Error -Message "Failed to import function $($import.fullname): $_"
-        }
-    }
-
-    
-   $configDir = "$Env:AppData\WindowsPowerShell\Modules\PSImgur\0.1\Config.ps1xml"
-$confusername = "$Env:AppData\WindowsPowerShell\Modules\PSImgur\0.1\Config_username.ps1xml"
- $ConfRefresh = "$Env:AppData\WindowsPowerShell\Modules\PSImgur\0.1\Config_refresh.ps1xml"
-if (-not (Test-Path $configDir) -or $force){
-        if ($force){"`$force detected"}
-        New-item -Force -Path "$configDir" -ItemType File
+param(
+    [parameter(Mandatory=$true,
+                ValueFromPipeline=$true,
+                ValueFromPipelineByPropertyName=$true,
+                HelpMessage='Please enter your Imgur Client ID')]
+                [ValidateNotNullOrEmpty()]
+                [string]$ClientID,
         
-        #response type must be code
-        Get-ImgurAuthCode -ClientID $ClientID -ResponseType code
+    [parameter(Mandatory=$true,
+                ValueFromPipeline=$true,
+                ValueFromPipelineByPropertyName=$true,
+                HelpMessage='Please enter your Imgur Client Secret')]
+                [ValidateNotNullOrEmpty()]
+                [string]$clientSecret
+    )
 
-        Get-ImgurAuthToken -ClientID $ClientID -clientSecret $clientSecret -authCode $authCode
+    $RegKey = "HKLM:\SOFTWARE\Imgur\API"
+    Write-Verbose "regkey; " $RegKey
+    if(Test-Path -Path $RegKey){
+        Write-Debug "Attempting to retrieve OAuth Info from Registry:`r`n"
 
-        #store the token and the username, securely
-        $password = ConvertTo-SecureString $imgur_accessToken -AsPlainText -Force
-        $password | ConvertFrom-SecureString | Export-Clixml $configDir -Force
-
-        $username = ConvertTo-SecureString $imgur_username -AsPlainText -Force
-        $username | ConvertFrom-SecureString | Export-Clixml $Confusername -Force
-
-        $refreshtkn = ConvertTo-SecureString $imgur_refreshToken -AsPlainText -Force
-        $refreshtkn | ConvertFrom-SecureString | Export-Clixml $ConfRefresh -Force
-
+        $ClientID = (Get-ItemProperty -Path $RegKey -Name 'ClientID').ClientID
+        $ClientSecret = (Get-ItemProperty -Path $RegKey -Name 'ClientSecret').ClientSecret
+        $AuthCode = (Get-ItemProperty -Path $RegKey -Name 'AuthCode').AuthCode
+        $AccessToken = (Get-ItemProperty -Path $RegKey -Name 'AccessToken').AccessToken
     }
     else{
-        try {
-             $password = Import-Clixml -Path $configDir -ErrorAction STOP | ConvertTo-SecureString
-             $imgur_username = Import-Clixml -Path $Confusername -ErrorAction STOP | ConvertTo-SecureString
-             }
-      catch {
-        Write-Warning "Corrupt Password file found, rerun with -Force to fix this"
-        BREAK
-       }
-        $Ptr = [System.Runtime.InteropServices.Marshal]::SecureStringToCoTaskMemUnicode($password)
-        $result = [System.Runtime.InteropServices.Marshal]::PtrToStringUni($Ptr)
-        [System.Runtime.InteropServices.Marshal]::ZeroFreeCoTaskMemUnicode($Ptr)
-        $global:imgur_accessToken = $result 
-        'Found cached Cred'
-        
-        
-        #Get-DecryptedValue 
-        #Get-DecryptedValue -inputObj $username -name Imgur_accessToken
-        Get-DecryptedValue -inputObj $username -name Imgur_username
-        continue
+        #if path does not exist, then get AuthCode
+        $AuthCode = Get-ImgurAuthCode -ClientID $ClientID -ResponseType code
 
+        if ($AuthCode){
 
-    }
-
+            Get-ImgurAuthToken -ClientID $ClientID -clientSecret $clientSecret -authCode $AuthCode    
+    
+        }
+    }     
 }

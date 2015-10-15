@@ -44,34 +44,60 @@ https://github.com/1RedOne/PSImgur
 #>
 Function Get-ImgurAccount {
 [CmdletBinding()]
-Param($accessToken=$Global:imgur_accessToken,
-                $username=$Global:imgur_username,
+Param(
         [switch]$favorites,
-        [switch]$uploads)
-        write-verbose @{"Authorization" = "Bearer $accessToken"}
-if ($favorites){
-    try {$result = Invoke-RestMethod https://api.imgur.com/3/account/$username/favorites -Method Get -Headers @{"Authorization" = "Bearer $accessToken"}}
-    catch{throw "Check Credentials, error 400"}
-    finally{
-        #convert epoch time to normal human time
-        $origin = New-Object -Type DateTime -ArgumentList 1970, 1, 1, 0, 0, 0, 0
+        [switch]$uploads
+    )
+
+        $RegKey = "HKLM:\SOFTWARE\Imgur\API"
+        $AccessToken = (Get-ItemProperty -Path $RegKey -Name 'AccessToken').AccessToken
+        $UserName = (Get-ItemProperty -Path $RegKey -Name 'UserName').UserName
         
-       ForEach ($result in $result.data){
-       $created = $origin.AddSeconds($result.datetime)
-       [pscustomobject]@{Title=$result.title;Link=$result.link;'Bandwidth(mb)'=$result.bandwidth / 1mb -as [int];Created=$created;views=$result.views;Upvotes=$result.ups;Downvotes=$result.downs}
-       }
-}
+        write-verbose @{"Authorization" = "Bearer $AccessToken"}
+    if ($favorites){
+        try {
+            $result = Invoke-RestMethod https://api.imgur.com/3/account/$UserName/favorites -Method Get -Headers @{"Authorization" = "Bearer $AccessToken"}
+            }
+        catch{
+            throw "Check Credentials, error 400"
+            }
+        finally{
+            #convert epoch time to normal human time
+            $origin = New-Object -Type DateTime -ArgumentList 1970, 1, 1, 0, 0, 0, 0
+        
+            ForEach ($result in $result.data){
+                $created = $origin.AddSeconds($result.datetime)
+                [pscustomobject]@{
+                    Title=$result.title;
+                    Link=$result.link;
+                    'Bandwidth(mb)'=$result.bandwidth / 1mb -as [int];
+                    Created=$created;
+                    views=$result.views;
+                    Upvotes=$result.ups;
+                    Downvotes=$result.downs
+                }
+            }
+        }
     }
     else{
-    try {$result = Invoke-RestMethod https://api.imgur.com/3/account/$username -Method Get -Headers @{"Authorization" = "Bearer $accessToken"}}
-    catch{throw "Check Credentials, error 400"}
-  finally{
-        #convert epoch time to normal human time
-        $origin = New-Object -Type DateTime -ArgumentList 1970, 1, 1, 0, 0, 0, 0
-        $created = $origin.AddSeconds($result.data.created)
+        try {
+            $result = Invoke-RestMethod https://api.imgur.com/3/account/$UserName -Method Get -Headers @{"Authorization" = "Bearer $AccessToken"}
+        }
+        catch{
+            throw "Check Credentials, error 400"
+        }
+        finally{
+            #convert epoch time to normal human time
+            $origin = New-Object -Type DateTime -ArgumentList 1970, 1, 1, 0, 0, 0, 0
+            $created = $origin.AddSeconds($result.data.created)
 
-       [pscustomobject]@{UserName=$result.data.url;Reputation=$result.data.reputation;Created=$created;Expiration=$result.data.pro_expiration}
-}
+            [pscustomobject]@{
+                UserName=$result.data.url;
+                Reputation=$result.data.reputation;
+                Created=$created;
+                Expiration=$result.data.pro_expiration
+            }
+        }
     }
     Write-Debug "Test results"
     
